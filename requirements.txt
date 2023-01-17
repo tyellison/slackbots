@@ -1,0 +1,7 @@
+slack_bolt
+tabulate
+skyfield
+urllib3
+datetime
+python-dateutil
+typing
