@@ -15,21 +15,21 @@ app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 ##### SLACK API CALLBACKS ##### 
 @app.event("app_mention")
 def handle_app_mention_events(logger):
-    logger.warning(f"{now_strftime()}: {Messages['app_mention']}")
+    logger.warning(fmt_log_msg('app_mention'))
 
 @app.event("message")
 def handle_message_events(logger):
-    logger.warning(f"{now_strftime}: {Messages['message']}")
+    logger.warning(fmt_log_msg('message'))
 
 @app.command("/daily_update")
 def handle_daily_update_command(ack, say, logger):
     ack()
 
     if daily_update_lock.acquire(blocking=False) == False:
-        logger.error(f"{now_strftime()}: {Messages['daily_update_enabled']}")
+        logger.error(fmt_log_msg('daily_update_enabled'))
         return
 
-    logger.warning(f"{now_strftime()}: {Messages['daily_update_disabled']}")
+    logger.warning(fmt_log_msg('daily_update_disabled'))
 
     tgt = dt.datetime(2023, 1, 1, 6, 0, 0)
     while True:
@@ -50,7 +50,7 @@ def handle_daily_update_command(ack, say, logger):
 def handle_pass_info_command(ack, logger, say):
     ack()
     pass_table = get_pass_table()
-    logger.warning(f"{now_strftime()}: {Messages['pass_info_enabled']}")
+    logger.warning(fmt_log_msg('pass_info_enabled'))
     say(pass_table)
 
 """ 
@@ -75,8 +75,14 @@ def get_weather():
     weather = []
     return weather
 
-def now_strftime(dt_format=DT_FORMAT):
-    return dt.datetime.now().strftime(DT_FORMAT)
+def fmt_log_msg(msg_key):
+    try:
+        msg = f"[{dt.datetime.now().strftime(DT_FORMAT)}]: {Messages[msg_key]}"
+    
+    except KeyError as e:
+        return e
+    
+    return msg
 
 
 if __name__ == "__main__":
