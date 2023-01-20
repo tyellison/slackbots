@@ -7,9 +7,9 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from pass_planner_helper import compute_passes
 
 
-DT_FORMAT = "%Y-%m-%d %H:%M"
 daily_update_lock = Lock()
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
+
 
 ##### SLACK API CALLBACKS ##### 
 @app.event("app_mention")
@@ -21,14 +21,14 @@ def handle_message_events(body, say):
     pass
 
 @app.command("/daily_update")
-def handle_daily_update_command(ack, body, say):
+def handle_daily_update_command(ack, say, logger):
     ack()
 
     if daily_update_lock.acquire(blocking=False) == False:
-        say(Messages["enabled"])
+        logger.error(Messages["enabled"])
         return
 
-    say(Messages["disabled"])
+    logger.warning(Messages["disabled"])
 
     tgt = dt.datetime(2023, 1, 1, 6, 0, 0)
     while True:
@@ -56,11 +56,11 @@ def handle_pass_info_command(ack, body, say):
 def handle_recur_command(ack, body, say):
 """
 
-def get_pass_table():
+def get_pass_table(dt_format="%Y-%m-%d %H:%M"):
     passes = compute_passes()
     passes = [pi_obj for pi_obj in passes if pi_obj.max_alt_deg >= 15.0]
     passes = [ 
-                [pi.local_start_time.strftime(DT_FORMAT), 
+                [pi.local_start_time.strftime(dt_format), 
                 round(pi.max_alt_deg, 0), 
                 round(pi.duration.total_seconds(), 0)] 
                 for pi in passes 
@@ -72,6 +72,7 @@ def get_pass_table():
 def get_weather():
     weather = []
     return weather
+
 
 if __name__ == "__main__":
     SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()
