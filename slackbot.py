@@ -113,8 +113,8 @@ def get_weather_alerts():
     
     try:
         req = get(url)
-        #alerts = json.loads(req.text)["alerts"]
-        return [1]
+        alerts = json.loads(req.text)["alerts"]
+        return alerts
     
     except:
         print(fmt_log_msg('http_error'))
