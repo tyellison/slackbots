@@ -1,5 +1,6 @@
-import os, time, datetime as dt
+import os, time, json, datetime as dt
 from messages import Messages
+from requests import get
 from threading import Lock
 from tabulate import tabulate
 from slack_bolt import App
@@ -8,11 +9,12 @@ from pass_planner_helper import compute_passes
 
 
 DT_FORMAT = "%Y-%m-%d %H:%M"
+WEATHERBIT_TOKEN = os.environ.get("WEATHERBIT_TOKEN")
 daily_update_lock = Lock()
+weather_alert_lock = Lock()
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 
 
-##### SLACK API CALLBACKS ##### 
 @app.event("app_mention")
 def handle_app_mention_events(logger):
     logger.warning(fmt_log_msg('app_mention'))
@@ -31,10 +33,9 @@ def handle_daily_update_command(ack, say, logger):
 
     logger.warning(fmt_log_msg('daily_update_disabled'))
 
-    tgt = dt.datetime(2023, 1, 1, 6, 0, 0)
     while True:
         now = dt.datetime.now()
-        tgt = dt.datetime.combine(now.date(), tgt.time())
+        tgt = now.replace(hour=6, minute=0, second=0, microsecond=0)
         td = tgt - now
 
         if td.days < 0:
@@ -42,9 +43,36 @@ def handle_daily_update_command(ack, say, logger):
             td = tgt - now
 
         time.sleep(td.total_seconds())
-        #weather = get_weather()
-        pass_table = get_pass_table()    
+        pass_table = get_pass_table() 
+        weather_alerts = get_weather_alerts()
+        num_alerts = len(weather_alerts)
+
+        if num_alerts > 0:
+            say(f"{num_alerts} {Messages['weather_alerts']}\n\n{pass_table}")   
+
         say(pass_table)
+        
+@app.command("/persistent_weather_alerts")
+def handle_weather_alert_listener_command(ack, logger, say):
+    ack()
+
+    if weather_alert_lock.acquire(blocking=False) == False:
+        logger.error(fmt_log_msg('persistent_weather_alerts_enabled'))
+        return
+    
+    logger.warning(fmt_log_msg('persistent_weather_alerts_disabled'))
+
+    while True:
+        now = dt.datetime.now()
+        tgt = now.replace(hour=now.hour, minute=0, second=0, microsecond=0)
+        tgt += dt.timedelta(hours=1)
+        td = tgt - now
+        time.sleep(td.total_seconds())
+        weather_alerts = get_weather_alerts()
+        num_alerts = len(weather_alerts)
+
+        if num_alerts > 0:
+            say(f"{num_alerts} {Messages['weather_alerts']}")
 
 @app.command("/pass_info")
 def handle_pass_info_command(ack, logger, say):
@@ -53,10 +81,19 @@ def handle_pass_info_command(ack, logger, say):
     logger.warning(fmt_log_msg('pass_info_enabled'))
     say(pass_table)
 
-""" 
-@app.command("/weather")
-def handle_recur_command(ack, body, say):
-"""
+@app.command("/weather_alerts")
+def handle_weather_alerts_command(ack, logger, say):
+    ack()
+    alerts = get_weather_alerts()
+
+    num_alerts = len(alerts)
+    
+    if num_alerts > 0:
+        alert_msg = f"{num_alerts} {Messages['weather_alerts']}"
+        say(alert_msg)
+    
+    else:
+        logger.warning(fmt_log_msg('no_weather_alerts'))
 
 def get_pass_table(dt_format=DT_FORMAT):
     passes = compute_passes()
@@ -71,9 +108,17 @@ def get_pass_table(dt_format=DT_FORMAT):
     pass_table = tabulate(passes, headers=pass_table_headers, tablefmt="plain", numalign="right", stralign="left")
     return pass_table
 
-def get_weather():
-    weather = []
-    return weather
+def get_weather_alerts():
+    url = f"{Messages['weatherbit_url']}{WEATHERBIT_TOKEN}"
+    
+    try:
+        req = get(url)
+        #alerts = json.loads(req.text)["alerts"]
+        return [1]
+    
+    except:
+        print(fmt_log_msg('http_error'))
+        return []
 
 def fmt_log_msg(msg_key):
     try:
@@ -87,4 +132,3 @@ def fmt_log_msg(msg_key):
 
 if __name__ == "__main__":
     SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()
-    
