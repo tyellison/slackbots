@@ -78,7 +78,7 @@ def handle_weather_alert_listener_command(ack, logger, say):
 def handle_pass_info_command(ack, logger, say):
     ack()
     pass_table = get_pass_table()
-    logger.warning(fmt_log_msg('pass_info_enabled'))
+    logger.warning(fmt_log_msg('pass_info'))
     say(pass_table)
 
 @app.command("/weather_alerts")
