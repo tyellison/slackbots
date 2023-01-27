@@ -53,7 +53,7 @@ def handle_daily_update_command(ack, say, logger):
         say(pass_table)
         
 @app.command("/persistent_weather_alerts")
-def handle_weather_alert_listener_command(ack, logger, say):
+def handle_persistent_weather_alerts_command(ack, logger, say):
     ack()
 
     if weather_alert_lock.acquire(blocking=False) == False:
@@ -61,18 +61,28 @@ def handle_weather_alert_listener_command(ack, logger, say):
         return
     
     logger.warning(fmt_log_msg('persistent_weather_alerts_disabled'))
+    daily_weather_alerts = []
 
     while True:
         now = dt.datetime.now()
-        tgt = now.replace(hour=now.hour, minute=0, second=0, microsecond=0)
+        tgt = now.replace(minute=0, second=0, microsecond=0)
         tgt += dt.timedelta(hours=1)
         td = tgt - now
         time.sleep(td.total_seconds())
         weather_alerts = get_weather_alerts()
-        num_alerts = len(weather_alerts)
+        new_alerts = 0
 
-        if num_alerts > 0:
-            say(f"{num_alerts} {Messages['weather_alerts']}")
+        for alert in weather_alerts:
+            if alert not in daily_weather_alerts:
+                daily_weather_alerts.append(alert)
+                new_alerts += 1
+                logger.warning(fmt_log_msg('new_weather_alerts'))
+
+        if new_alerts > 0:
+            say(f"{new_alerts} {Messages['weather_alerts']}")
+
+        if tgt.hour == 0:
+            daily_weather_alerts.clear()
 
 @app.command("/pass_info")
 def handle_pass_info_command(ack, logger, say):
@@ -91,6 +101,7 @@ def handle_weather_alerts_command(ack, logger, say):
     if num_alerts > 0:
         alert_msg = f"{num_alerts} {Messages['weather_alerts']}"
         say(alert_msg)
+        logger.warning(fmt_log_msg('new_weather_alerts'))
     
     else:
         logger.warning(fmt_log_msg('no_weather_alerts'))
