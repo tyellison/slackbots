@@ -61,12 +61,17 @@ def handle_persistent_weather_alerts_command(ack, logger, say):
         return
     
     logger.warning(fmt_log_msg('persistent_weather_alerts_disabled'))
+    blackout_hours = {6}
     daily_weather_alerts = []
 
     while True:
         now = dt.datetime.now()
         tgt = now.replace(minute=0, second=0, microsecond=0)
         tgt += dt.timedelta(hours=1)
+
+        if tgt.hour in blackout_hours:
+            continue
+
         td = tgt - now
         time.sleep(td.total_seconds())
         weather_alerts = get_weather_alerts()
