@@ -8,7 +8,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from pass_planner_helper import compute_passes
 
 
-DT_FORMAT = "%Y-%m-%d %H:%M:%S:%f"
+DT_FORMAT = "%Y-%m-%d %H:%M"
 DAILY_UPDATE_MINUTE = 5
 DAILY_UPDATE_HOUR = 6
 WEATHER_ALERT_BLACKOUT_HOURS = {DAILY_UPDATE_HOUR}
