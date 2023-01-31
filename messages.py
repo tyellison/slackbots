@@ -1,7 +1,7 @@
 Messages = {
     "daily_update_enabled" : "Sorry, it looks like daily updates are already enabled",
     "daily_update_disabled" : "Daily updates enabled",
-    "pass_info" : "Pass info enabled",
+    "pass_info" : "Pass info command received",
     "app_mention" : "App mentioned in channel",
     "message" : "Message received from slack channel",
     "http_error" : "HTTP request failed",
