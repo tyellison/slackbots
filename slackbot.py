@@ -8,11 +8,16 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from pass_planner_helper import compute_passes
 
 
-DT_FORMAT = "%Y-%m-%d %H:%M"
-WEATHERBIT_TOKEN = os.environ.get("WEATHERBIT_TOKEN")
-BLACKOUT_HOURS = {6}
-daily_update_lock = Lock()
-weather_alert_lock = Lock()
+DT_FORMAT = "%Y-%m-%d %H:%M:%S:%f"
+DAILY_UPDATE_MINUTE = 5
+DAILY_UPDATE_HOUR = 6
+WEATHER_ALERT_BLACKOUT_HOURS = {DAILY_UPDATE_HOUR}
+DAILY_WEATHER_ALERTS = []
+DAILY_WEATHER_ALERTS_DATA_LOCK = Lock()
+DAILY_UPDATE_THREAD_LOCK = Lock()
+WEATHER_ALERT_THREAD_LOCK = Lock()
+HTTP_TIMEOUT = 90
+THREAD_TIMEOUT = HTTP_TIMEOUT * 2
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 
 
@@ -28,7 +33,7 @@ def handle_message_events(logger):
 def handle_daily_update_command(ack, say, logger):
     ack()
 
-    if daily_update_lock.acquire(blocking=False) == False:
+    if DAILY_UPDATE_THREAD_LOCK.acquire(blocking=False) == False:
         logger.error(fmt_log_msg('daily_update_enabled'))
         return
 
@@ -36,7 +41,7 @@ def handle_daily_update_command(ack, say, logger):
 
     while True:
         now = dt.datetime.now()
-        tgt = now.replace(hour=6, minute=0, second=0, microsecond=0)
+        tgt = now.replace(hour=DAILY_UPDATE_HOUR, minute=DAILY_UPDATE_MINUTE, second=0, microsecond=0)
         td = tgt - now
 
         if td.days < 0:
@@ -45,24 +50,29 @@ def handle_daily_update_command(ack, say, logger):
 
         time.sleep(td.total_seconds())
         pass_table = get_pass_table() 
-        weather_alerts = get_weather_alerts()
+        weather_alerts = []
+
+        DAILY_WEATHER_ALERTS_DATA_LOCK.acquire(blocking=True, timeout=THREAD_TIMEOUT)
+        weather_alerts = DAILY_WEATHER_ALERTS.copy()
+        DAILY_WEATHER_ALERTS_DATA_LOCK.release()
+
         num_alerts = len(weather_alerts)
 
         if num_alerts > 0:
             say(f"{num_alerts} {Messages['weather_alerts']}\n\n{pass_table}")   
-
-        say(pass_table)
+        
+        else:
+            say(pass_table)
         
 @app.command("/persistent_weather_alerts")
 def handle_persistent_weather_alerts_command(ack, logger, say):
     ack()
 
-    if weather_alert_lock.acquire(blocking=False) == False:
+    if WEATHER_ALERT_THREAD_LOCK.acquire(blocking=False) == False:
         logger.error(fmt_log_msg('persistent_weather_alerts_enabled'))
         return
     
     logger.warning(fmt_log_msg('persistent_weather_alerts_disabled'))
-    daily_weather_alerts = []
 
     while True:
         now = dt.datetime.now()
@@ -70,21 +80,24 @@ def handle_persistent_weather_alerts_command(ack, logger, say):
         tgt += dt.timedelta(hours=1)
         td = tgt - now
         time.sleep(td.total_seconds())
-
         weather_alerts = get_weather_alerts()
         new_alerts = 0
 
-        for alert in weather_alerts:
-            if alert not in daily_weather_alerts:
-                daily_weather_alerts.append(alert)
-                new_alerts += 1
-                logger.warning(fmt_log_msg('new_weather_alerts'))
+        DAILY_WEATHER_ALERTS_DATA_LOCK.acquire(blocking=True, timeout=THREAD_TIMEOUT)
+        if tgt.hour == DAILY_UPDATE_HOUR:
+            DAILY_WEATHER_ALERTS.clear()
 
-        if new_alerts > 0 and tgt.hour not in BLACKOUT_HOURS:
+        for alert in weather_alerts:
+            if alert not in DAILY_WEATHER_ALERTS:
+                DAILY_WEATHER_ALERTS.append(alert)
+                new_alerts += 1
+
+        DAILY_WEATHER_ALERTS_DATA_LOCK.release()
+
+        if new_alerts > 0 and tgt.hour not in WEATHER_ALERT_BLACKOUT_HOURS:
             say(f"{new_alerts} {Messages['weather_alerts']}")
 
-        if tgt.hour == 0:
-            daily_weather_alerts.clear()
+        {logger.warning(fmt_log_msg(alert)) for alert in weather_alerts}
 
 @app.command("/pass_info")
 def handle_pass_info_command(ack, logger, say):
@@ -122,10 +135,10 @@ def get_pass_table(dt_format=DT_FORMAT):
     return pass_table
 
 def get_weather_alerts():
-    url = f"{Messages['weatherbit_url']}{WEATHERBIT_TOKEN}"
+    url = f"{Messages['weatherbit_url']}{os.environ.get('WEATHERBIT_TOKEN')}"
     
     try:
-        req = get(url)
+        req = get(url, timeout=HTTP_TIMEOUT)
         alerts = json.loads(req.text)["alerts"]
         return alerts
     
@@ -133,12 +146,12 @@ def get_weather_alerts():
         print(fmt_log_msg('http_error'))
         return []
 
-def fmt_log_msg(msg_key):
-    try:
-        msg = f"[{dt.datetime.now().strftime(DT_FORMAT)}]: {Messages[msg_key]}"
+def fmt_log_msg(msg):
+    if msg in Messages:
+        msg = f"[{dt.datetime.now().strftime(DT_FORMAT)}]: {Messages[msg]}"
     
-    except KeyError as e:
-        return e
+    else:
+        msg = f"[{dt.datetime.now().strftime(DT_FORMAT)}]: {msg}"
     
     return msg
 
