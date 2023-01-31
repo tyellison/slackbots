@@ -1,3 +1,8 @@
+'''
+This code was reproduced from Richard Arthurs via the ORCASat 
+gitlab January 17, 2023. 
+'''
+
 from datetime import timedelta, datetime
 from dateutil import tz
 from typing import List, SupportsFloat, Tuple, Optional
