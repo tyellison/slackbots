@@ -285,7 +285,7 @@ def get_weather_alerts():
         print(fmt_log_msg('http_error'))
         return []
 
-def fmt_log_msg(msg):
+def fmt_log_msg(msg, dt_format=DT_FORMAT):
     """
     Creates a formatted string to be logged to the console the application is run from.
     Note how messages are kept in Message dictionary to keep long strings away from the
@@ -302,11 +302,12 @@ def fmt_log_msg(msg):
                               extra information contained in the msg argument.
     """
 
-    if msg in Messages:
-        fmt_msg = f"[{dt.datetime.now().strftime(DT_FORMAT)}]: {Messages[msg]}"
+    try:
+        if msg in Messages:
+            fmt_msg = f"[{dt.datetime.now().strftime(dt_format)}]: {Messages[msg]}"
     
-    else:
-        fmt_msg = f"[{dt.datetime.now().strftime(DT_FORMAT)}]: {msg}"
+    except KeyError:
+        fmt_msg = f"[{dt.datetime.now().strftime(dt_format)}]: {msg}"
     
     return fmt_msg
 
