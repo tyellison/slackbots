@@ -82,6 +82,8 @@ def handle_daily_update_command(ack, say, logger):
 
     logger.warning(fmt_log_msg('daily_update_disabled'))
 
+    weather_alerts = []
+
     while True:
         now = dt.datetime.now()
         tgt = now.replace(hour=DAILY_UPDATE_HOUR, minute=DAILY_UPDATE_MINUTE, second=0, microsecond=0)
@@ -93,8 +95,7 @@ def handle_daily_update_command(ack, say, logger):
 
         time.sleep(td.total_seconds())
         pass_table = get_pass_table() 
-        weather_alerts = []
-
+        
         DAILY_WEATHER_ALERTS_DATA_LOCK.acquire(blocking=True, timeout=THREAD_TIMEOUT)
         weather_alerts = DAILY_WEATHER_ALERTS.copy()
         DAILY_WEATHER_ALERTS_DATA_LOCK.release()
@@ -153,8 +154,7 @@ def handle_persistent_weather_alerts_command(ack, logger, say):
 
     while True:
         now = dt.datetime.now()
-        tgt = now.replace(minute=0, second=0, microsecond=0)
-        tgt += dt.timedelta(hours=1)
+        tgt = now.replace(hour=now.hour+1, minute=0, second=0, microsecond=0)
         td = tgt - now
         time.sleep(td.total_seconds())
         weather_alerts = get_weather_alerts()
@@ -304,12 +304,18 @@ def fmt_log_msg(msg, dt_format=DT_FORMAT):
 
     try:
         if msg in Messages:
-            fmt_msg = f"[{dt.datetime.now().strftime(dt_format)}]: {Messages[msg]}"
-    
+            return f"[{dt.datetime.now().strftime(dt_format)}]: {Messages[msg]}"
+        
+        else:
+            return f"[{dt.datetime.now().strftime(dt_format)}]: {msg}"
+
     except KeyError:
-        fmt_msg = f"[{dt.datetime.now().strftime(dt_format)}]: {msg}"
+        return f"[{dt.datetime.now().strftime(dt_format)}]: {msg}"
     
-    return fmt_msg
+    except TypeError:
+        return f"[{dt.datetime.now().strftime(dt_format)}]: {msg}"
+    
+    
 
 
 if __name__ == "__main__":
