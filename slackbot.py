@@ -154,7 +154,8 @@ def handle_persistent_weather_alerts_command(ack, logger, say):
 
     while True:
         now = dt.datetime.now()
-        tgt = now.replace(hour=now.hour+1, minute=0, second=0, microsecond=0)
+        tgt = now.replace(minute=0, second=0, microsecond=0)
+        tgt += dt.timedelta(hours=1)
         td = tgt - now
         time.sleep(td.total_seconds())
         weather_alerts = get_weather_alerts()
