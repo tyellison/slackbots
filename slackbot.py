@@ -315,6 +315,7 @@ def get_weather_alerts():
     
     except AttributeError as err:
         return [str(vic_soup.find_all("p"))]
+    
     except:
         print(fmt_log_msg('http_error'))
         return []
