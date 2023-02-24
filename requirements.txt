@@ -6,4 +6,3 @@ datetime
 python-dateutil
 typing
 bs4
-re
