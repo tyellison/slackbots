@@ -175,7 +175,7 @@ def handle_persistent_weather_alerts_command(ack, logger, say):
         DAILY_WEATHER_ALERTS_DATA_LOCK.release()
 
         if new_alerts > 0 and tgt.hour not in WEATHER_ALERT_BLACKOUT_HOURS:
-            say(f"{new_alerts} {Messages['weather_alerts']}")
+            say(f"{Messages['weather_alerts']}")
 
         {logger.warning(fmt_log_msg(alert)) for alert in weather_alerts}
 
