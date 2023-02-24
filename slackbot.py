@@ -1,5 +1,7 @@
 import os, time, json, datetime as dt
 from messages import Messages
+from re import search
+from bs4 import BeautifulSoup
 from requests import get
 from threading import Lock
 from tabulate import tabulate
@@ -103,7 +105,7 @@ def handle_daily_update_command(ack, say, logger):
         num_alerts = len(weather_alerts)
 
         if num_alerts > 0:
-            say(f"{num_alerts} {Messages['weather_alerts']}\n\n{pass_table}")   
+            say(f"{Messages['weather_alerts']}\n\n{pass_table}")   
         
         else:
             say(pass_table)
@@ -222,7 +224,7 @@ def handle_weather_alerts_command(ack, logger, say):
     num_alerts = len(alerts)
     
     if num_alerts > 0:
-        alert_msg = f"{num_alerts} {Messages['weather_alerts']}"
+        alert_msg = f"{Messages['weather_alerts']}"
         say(alert_msg)
         logger.warning(fmt_log_msg('new_weather_alerts'))
     
@@ -274,14 +276,45 @@ def get_weather_alerts():
         Returns: 
 
     """
-
-    url = f"{Messages['weatherbit_url']}{os.environ.get('WEATHERBIT_TOKEN')}"
+    """
+    ################################### Warning ###################################
+        The following line is a deprecated string which specifies the web 
+        address for the Weatherbit API which is not currently being used.
+    ###############################################################################
+    weatherbit_url = f"{Messages['weatherbit_url']}{os.environ.get('WEATHERBIT_TOKEN')}"
+    ###############################################################################
+    """
+    gc_url = Messages['weather_gc_url']
     
     try:
-        req = get(url, timeout=HTTP_TIMEOUT)
+        req = get(gc_url, timeout=HTTP_TIMEOUT)
+        """
+        ################################### Warning ###################################
+            The following line sends a request to the weatherbit API. Weatherbit has
+            taken well over 24 hours to update their alert data after an alert has 
+            been posted to the government of Canada website. For this reason it has
+            been decided to scrape the government website directly to get punctual
+            alerts. Unfortunately, scraping the html directly opens the door to 
+            other reliability problems - mainly if the government of Canada ever 
+            changes the structure of their website, the scraper may not . 
+            Furthermore, constructing regular expressions to pattern match html may 
+            also fail if the content being looked for changes in structure. 
+            
+            Ideally, both a third party alert API and direct scraping could be used 
+            in an ensemble way to get new alerts and then . But this would take too 
+            much time to do right now given there are other problems which take 
+            priority. 
+        ###############################################################################
         alerts = json.loads(req.text)["alerts"]
-        return alerts
+        ###############################################################################
+        """
+         
+        vic_soup = BeautifulSoup(req.text)
+        search("[Nn][Oo] [Aa][Ll][Ee][Rr][Tt][Ss]", str(vic_soup.find_all("p"))).group()
+        return []
     
+    except AttributeError as err:
+        return [str(vic_soup.find_all("p"))]
     except:
         print(fmt_log_msg('http_error'))
         return []
@@ -316,8 +349,6 @@ def fmt_log_msg(msg, dt_format=DT_FORMAT):
     except TypeError:
         return f"[{dt.datetime.now().strftime(dt_format)}]: {msg}"
     
-    
-
 
 if __name__ == "__main__":
     SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()
